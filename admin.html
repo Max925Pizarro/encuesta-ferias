@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Panel de Administración – Encuesta Ferias Libres USACH (acceso restringido)">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Admin | Encuesta Ferias Libres</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts – Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <!-- SheetJS para exportación nativa a Excel (.xlsx) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- QRCode.js -->
+  <script src="js/qrcode.min.js"></script>
+  <script>if (typeof QRCode === 'undefined') { document.write('<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"><\/script>'); }</script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50:'#f0fdf4', 100:'#dcfce7', 200:'#bbf7d0', 300:'#86efac',
+              400:'#4ade80', 500:'#22c55e', 600:'#16a34a', 700:'#15803d', 800:'#166534', 900:'#14532d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+
+    /* ── Sidebar items & Dark Emerald theme ── */
+    #sidebar {
+      background-color: #1E7A5A !important;
+      border-right: 1px solid rgba(15, 60, 44, 0.4);
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.68rem 0.875rem;
+      border-radius: 0.625rem;
+      color: #d1fae5;
+      font-weight: 500; font-size: 0.8125rem;
+      cursor: pointer;
+      transition: background .15s, color .15s, transform .1s;
+      width: 100%; text-align: left;
+    }
+    .nav-item:hover { background: rgba(255, 255, 255, 0.12); color: #ffffff; }
+    .nav-item.active {
+      background: rgba(255, 255, 255, 0.22);
+      color: #ffffff;
+      font-weight: 700;
+      border-left: 3px solid #86efac;
+    }
+    .nav-item.danger { color: #fca5a5; }
+    .nav-item.danger:hover { background: rgba(239, 68, 68, 0.25); color: #ffffff; }
+
+    /* ── Paneles de contenido ── */
+    .panel { display: none; }
+    .panel.active { display: block; animation: fadeIn .3s ease; }
+
+    @keyframes fadeIn {
+      from { opacity:0; transform:translateY(6px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    /* ── Cards de estadística ── */
+    .stat-card {
+      background: white; border-radius: 1rem;
+      padding: 1.25rem 1.5rem;
+      border: 1px solid #e2e8f0;
+      transition: box-shadow .2s, transform .2s;
+    }
+    .stat-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,.06);
+      transform: translateY(-2px);
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #f8fafc; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* ── Tabla ── */
+    .resp-table tbody tr:hover { background: #f8fafc; }
+    .resp-table th {
+      font-size: .7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: #94a3b8;
+    }
+
+    /* ── Mobile sidebar overlay ── */
+    .sidebar-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.3);
+      z-index: 40; opacity: 0; pointer-events: none;
+      transition: opacity .25s;
+    }
+    .sidebar-overlay.active { opacity: 1; pointer-events: auto; }
+
+    /* Mobile: sidebar is a fixed drawer */
+    @media (max-width: 1023px) {
+      .sidebar-desktop {
+        position: fixed; top: 0; left: -280px; bottom: 0;
+        width: 256px; z-index: 50;
+        transition: left .3s cubic-bezier(.4,0,.2,1);
+      }
+      .sidebar-desktop.open { left: 0; }
+    }
+    /* Desktop: sidebar is a sticky flex child */
+    @media (min-width: 1024px) {
+      .sidebar-desktop {
+        position: sticky; top: 0;
+        width: 256px; flex-shrink: 0;
+        height: 100vh; overflow-y: auto;
+      }
+    }
+
+    /* ── Question card editable ── */
+    .q-edit-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.875rem;
+      padding: 1rem 1.25rem;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .q-edit-card:hover {
+      border-color: #86efac;
+      box-shadow: 0 2px 12px rgba(22,163,74,.08);
+    }
+
+    /* ── Drag & Drop question cards ── */
+    .q-flow-card {
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+      touch-action: manipulation;
+    }
+    .q-flow-card.is-dragging {
+      opacity: 0.45;
+      border: 2px dashed #10b981 !important;
+      background: #f0fdf4 !important;
+      transform: scale(0.99);
+    }
+    .q-flow-card.drag-over {
+      border-top: 3px solid #10b981 !important;
+      background: #ecfdf5 !important;
+    }
+    .drag-handle {
+      cursor: grab;
+      user-select: none;
+    }
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+    @keyframes pulseSuccess {
+      0% { background-color: #d1fae5; }
+      100% { background-color: transparent; }
+    }
+    .q-pulse-reorder {
+      animation: pulseSuccess 0.8s ease-out;
+    }
+
+    /* ── Inputs y selects ── */
+    select, input[type="text"], input[type="number"], input[type="url"],
+    input[type="email"], input[type="password"], textarea {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- ════════════════════════════════════════════
+     PANTALLA DE LOGIN
+════════════════════════════════════════════ -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center
+     bg-gradient-to-br from-gray-50 via-white to-brand-50 p-4">
+  <div class="w-full max-w-md">
+
+    <!-- Encabezado login -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl
+           bg-brand-600 shadow-lg shadow-brand-600/20 mb-4">
+        <svg class="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-extrabold text-gray-800 mb-1">Panel Administrativo</h1>
+      <p class="text-gray-400 text-sm">Encuesta Ferias Libres · USACH</p>
+    </div>
+
+    <!-- Formulario -->
+    <div class="bg-white border border-gray-200 rounded-2xl p-8 shadow-lg shadow-gray-200/50">
+      <form id="login-form" class="space-y-5">
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-600 mb-1.5">Correo institucional</label>
+          <input type="email" id="login-email" required autocomplete="email"
+            placeholder="usuario@usach.cl"
+            class="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800
+                   placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500
+                   focus:border-transparent focus:bg-white transition-all text-sm">
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-600 mb-1.5">Contraseña</label>
+          <div class="relative">
+            <input type="password" id="login-password" required autocomplete="current-password"
+              placeholder="••••••••"
+              class="w-full px-4 py-3 pr-12 rounded-xl bg-gray-50 border border-gray-200 text-gray-800
+                     placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500
+                     focus:border-transparent focus:bg-white transition-all text-sm">
+            <button type="button" id="toggle-pwd"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path id="eye-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Error de login -->
+        <div id="login-error" class="hidden items-center gap-2 bg-red-50 border border-red-200
+             rounded-xl px-4 py-3 text-red-600 text-sm">
+          <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <span id="login-error-text">Acceso denegado.</span>
+        </div>
+
+        <button type="submit" id="login-btn"
+          class="w-full py-3.5 rounded-xl bg-brand-600 text-white font-bold text-sm
+                 hover:bg-brand-700 active:scale-[0.98] transition-all duration-150
+                 shadow-md shadow-brand-600/20 flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+          </svg>
+          <span id="login-btn-text">Iniciar sesión</span>
+        </button>
+      </form>
+    </div>
+
+    <p class="text-center text-gray-400 text-xs mt-5">
+      Acceso restringido · Solo administradoras autorizadas
+    </p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     PANEL ADMINISTRATIVO
+════════════════════════════════════════════ -->
+<div id="admin-panel" class="flex-col lg:flex-row min-h-screen" style="display:none">
+
+  <!-- ─── Mobile sidebar overlay ─── -->
+  <div id="sidebar-overlay" class="sidebar-overlay lg:hidden" onclick="window.__admin.closeMobileMenu()"></div>
+
+  <!-- ─── Sidebar (desktop: fixed, mobile: drawer) ─── -->
+  <aside id="sidebar" class="sidebar-desktop flex flex-col shadow-lg">
+
+    <!-- Logo / Brand -->
+    <div class="p-5 border-b border-emerald-800/60">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center flex-shrink-0 shadow-sm">
+          <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="font-bold text-white text-sm leading-tight">Ferias Libres</p>
+          <p class="text-emerald-200/80 text-xs">Panel USACH</p>
+        </div>
+      </div>
+      <!-- Sesión activa -->
+      <div class="mt-4 bg-[#166549] border border-emerald-600/40 rounded-xl p-3">
+        <p class="text-xs text-emerald-200/80 font-medium">Sesión activa</p>
+        <p id="sidebar-user-email" class="text-xs text-white font-semibold mt-0.5 truncate"></p>
+      </div>
+    </div>
+
+    <!-- Navegación -->
+    <nav class="p-3 flex-1 space-y-0.5 mt-1 overflow-y-auto">
+      <button class="nav-item active" id="nav-dashboard" onclick="window.__admin.showPanel('dashboard')">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+        </svg>
+        Dashboard
+      </button>
+      <button class="nav-item" id="nav-preguntas-fijas" onclick="window.__admin.showPanel('preguntas-fijas')">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
+        Editar Preguntas
+      </button>
+      <button class="nav-item" id="nav-preguntas" onclick="window.__admin.showPanel('preguntas')">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+        </svg>
+        Preguntas Dinámicas
+      </button>
+      <button class="nav-item" id="nav-qr" onclick="window.__admin.showPanel('qr')">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+        </svg>
+        Código QR
+      </button>
+    </nav>
+
+    <!-- Cerrar sesión -->
+    <div class="p-3 border-t border-emerald-800/60">
+      <button class="nav-item danger" onclick="window.__admin.logout()">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+        Cerrar sesión
+      </button>
+    </div>
+  </aside>
+
+  <!-- ─── Contenido principal ─── -->
+  <main class="flex-1 overflow-auto min-w-0 bg-[#F8F9FA]">
+
+    <!-- Top bar -->
+    <header class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-3.5
+                   flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <!-- Hamburger (mobile) -->
+        <button id="mobile-menu-btn" class="lg:hidden p-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors"
+                onclick="window.__admin.openMobileMenu()">
+          <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <div>
+          <h2 id="panel-title" class="text-base sm:text-lg font-bold text-gray-800">Dashboard</h2>
+          <p class="text-xs text-gray-400 mt-0.5 hidden sm:block">Encuesta a comerciantes de ferias libres</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-50 text-brand-700
+                     rounded-full text-xs font-bold">
+          <span class="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse"></span>
+          <span class="hidden sm:inline">En tiempo real</span>
+        </span>
+        <button onclick="window.__admin.exportToExcel()"
+          class="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm active:scale-95">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <span class="hidden sm:inline">Exportar Excel</span>
+          <span class="sm:hidden">Excel</span>
+        </button>
+        <a href="index.html" target="_blank"
+          class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-50 hover:bg-gray-100
+                 text-gray-600 rounded-xl text-sm font-semibold transition-colors border border-gray-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+          Ver encuesta
+        </a>
+      </div>
+    </header>
+
+    <div class="p-4 sm:p-6 space-y-6">
+
+      <!-- ══════════ PANEL: DASHBOARD ══════════ -->
+      <section id="panel-dashboard" class="panel active">
+
+        <!-- Tarjetas de métricas (KPIs superiores analíticos) -->
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
+          
+          <!-- KPI 1: Total Muestra -->
+          <div class="stat-card border-l-4 border-l-emerald-500 bg-white shadow-sm p-4 rounded-2xl flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <p class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Total Respuestas</p>
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <p id="stat-total" class="text-2xl sm:text-3xl font-black text-gray-800">0</p>
+                <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200">100%</span>
+              </div>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-2">Muestra total consolidada</p>
+          </div>
+
+          <!-- KPI 2: Formalización Ley 21.745 (P16) -->
+          <div class="stat-card border-l-4 border-l-brand-600 bg-white shadow-sm p-4 rounded-2xl flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <p class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Formalizados</p>
+                <span class="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">P16: Inscrito</span>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <p id="stat-inscritos" class="text-2xl sm:text-3xl font-black text-emerald-700">0</p>
+                <span id="stat-inscritos-pct" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200">0%</span>
+              </div>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-2">inscritos en nuevo régimen</p>
+          </div>
+
+          <!-- KPI 3: Penetración Medios de Pago / POS (P14) -->
+          <div class="stat-card border-l-4 border-l-indigo-500 bg-white shadow-sm p-4 rounded-2xl flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <p class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Cobro con Tarjeta</p>
+                <span class="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">P14: POS</span>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <p id="stat-pos" class="text-2xl sm:text-3xl font-black text-indigo-700">0</p>
+                <span id="stat-pos-pct" class="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-full border border-indigo-200">0%</span>
+              </div>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-2">dispositivo POS habilitado</p>
+          </div>
+
+          <!-- KPI 4: Déficit Informativo (P17) -->
+          <div class="stat-card border-l-4 border-l-rose-500 bg-white shadow-sm p-4 rounded-2xl flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <p class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Brecha Informativa</p>
+                <span class="text-[9px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded">P17: Falta info</span>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <p id="stat-gap" class="text-2xl sm:text-3xl font-black text-rose-600">0</p>
+                <span id="stat-gap-pct" class="text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded-full border border-rose-200">0%</span>
+              </div>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-2">requieren difusión directa</p>
+          </div>
+
+          <!-- KPI 5: Comuna Recoleta -->
+          <div class="stat-card border-l-4 border-l-blue-500 bg-white shadow-sm p-4 rounded-2xl flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <p class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Recoleta</p>
+                <span class="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">P1</span>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <p id="stat-recoleta" class="text-2xl sm:text-3xl font-black text-blue-600">0</p>
+                <span id="stat-recoleta-pct" class="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-full border border-blue-200">0%</span>
+              </div>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-2">del total de encuestados</p>
+          </div>
+
+          <!-- KPI 6: Comuna Huechuraba -->
+          <div class="stat-card border-l-4 border-l-violet-500 bg-white shadow-sm p-4 rounded-2xl flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <p class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Huechuraba</p>
+                <span class="text-[9px] font-bold text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded">P1</span>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <p id="stat-huechuraba" class="text-2xl sm:text-3xl font-black text-violet-600">0</p>
+                <span id="stat-huechuraba-pct" class="text-[10px] font-bold text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded-full border border-violet-200">0%</span>
+              </div>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-2">del total de encuestados</p>
+          </div>
+
+        </div>
+
+        <!-- Barra de Filtros Dinámicos -->
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 mb-6">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+              </svg>
+              Filtros Dinámicos de Análisis
+            </h3>
+            <span id="active-filter-badge" class="text-xs text-emerald-700 font-medium bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
+              Filtrando datos en tiempo real
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">Comuna (P1)</label>
+              <select id="filter-comuna" onchange="window.__admin.applyFilters()"
+                class="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-gray-50">
+                <option value="">Todas las comunas</option>
+                <option value="Recoleta">Recoleta</option>
+                <option value="Huechuraba">Huechuraba</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">Feria (P2)</label>
+              <select id="filter-feria" onchange="window.__admin.applyFilters()"
+                class="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-gray-50">
+                <option value="">Todas las ferias</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">Día de Feria (P2)</label>
+              <select id="filter-dia" onchange="window.__admin.applyFilters()"
+                class="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-gray-50">
+                <option value="">Todos los días</option>
+                <option value="lunes">Lunes</option>
+                <option value="martes">Martes</option>
+                <option value="miércoles">Miércoles</option>
+                <option value="jueves">Jueves</option>
+                <option value="viernes">Viernes</option>
+                <option value="sábado">Sábado</option>
+                <option value="domingo">Domingo</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">Situación Ley 21.745 (P16)</label>
+              <select id="filter-q7" onchange="window.__admin.applyFilters()"
+                class="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-gray-50">
+                <option value="">Todos los estados</option>
+                <option value="Estoy inscrito/a.">Inscritos (Rama A)</option>
+                <option value="No estoy inscrito/a.">No inscritos (Rama B)</option>
+                <option value="Estoy realizando el trámite.">En trámite (Rama C)</option>
+                <option value="No sé si estoy inscrito/a.">No sabe (Rama D)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════ PANEL ANALÍTICO CENTRAL: LEY N.º 21.745 ══════════ -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+          <!-- Gráfico 1: Estado de Formalización (P16 / Ramas A, B, C, D) -->
+          <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 flex flex-col justify-between">
+            <div>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-gray-100 gap-2 mb-4">
+                <div>
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider">
+                      P16 · Formalización
+                    </span>
+                    <span id="q8-active-filter-badge" class="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                      Universo consolidado
+                    </span>
+                  </div>
+                  <h3 id="q16-header-title" class="text-sm sm:text-base font-bold text-gray-800">
+                    Situación Frente a la Ley N.º 21.745
+                  </h3>
+                  <p id="q16-header-subtitle" class="text-xs text-gray-400 mt-0.5">
+                    Distribución de comerciantes según su incorporación al régimen especial simplificado
+                  </p>
+                </div>
+
+                <!-- Selector de formato -->
+                <div class="flex items-center gap-1.5 self-start sm:self-auto flex-shrink-0">
+                  <select id="q8-chart-type" onchange="window.__admin.renderQ8Chart()"
+                    class="px-2.5 py-1 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="doughnut" selected>Dona</option>
+                    <option value="pie">Pastel</option>
+                    <option value="horizontalBar">Barras Horiz.</option>
+                    <option value="bar">Barras Vert.</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Canvas Gráfico P16 -->
+              <div class="flex flex-col items-center justify-center bg-gray-50/70 rounded-2xl border border-gray-100 p-3 relative mb-4" style="height: 270px;">
+                <canvas id="q8-chart"></canvas>
+                <div id="q8-chart-empty" class="hidden absolute inset-0 flex flex-col items-center justify-center text-gray-300">
+                  <svg class="w-10 h-10 mb-1 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+                  </svg>
+                  <p class="font-semibold text-xs text-gray-500">Sin datos registrados para estos filtros</p>
+                </div>
+              </div>
+
+              <!-- Tarjetas de desglose de opciones P16 -->
+              <div class="mb-3">
+                <div class="flex items-center justify-between pb-1.5 border-b border-gray-100 mb-2">
+                  <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Desglose de Comerciantes</span>
+                  <span id="q8-total-eval" class="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    0 respuestas
+                  </span>
+                </div>
+                <div id="q8-breakdown-cards" class="space-y-2">
+                  <!-- Se llena dinámicamente con las 4 categorías de P16 -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Insight interpretativo P16 -->
+            <div class="bg-emerald-50/60 rounded-xl p-3 border border-emerald-100 flex items-start gap-2.5 mt-2">
+              <svg class="w-4 h-4 text-emerald-700 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <p id="q8-insight-text" class="text-xs text-emerald-950 leading-relaxed">
+                Calculando diagnóstico de formalización...
+              </p>
+            </div>
+          </div>
+
+          <!-- Gráfico 2: Brecha de Información y Autopercepción (P17) -->
+          <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 flex flex-col justify-between">
+            <div>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-gray-100 gap-2 mb-4">
+                <div>
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase tracking-wider">
+                      P17 · Autopercepción
+                    </span>
+                    <span id="p17-gap-badge" class="text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                      Evaluando brecha...
+                    </span>
+                  </div>
+                  <h3 class="text-sm sm:text-base font-bold text-gray-800">
+                    Suficiencia de Información Percibida
+                  </h3>
+                  <p class="text-xs text-gray-400 mt-0.5">
+                    ¿Usted personalmente siente que tiene suficiente información para entender la ley?
+                  </p>
+                </div>
+
+                <div class="flex items-center gap-1.5 self-start sm:self-auto flex-shrink-0">
+                  <span class="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-xl border border-indigo-200">
+                    Escala %
+                  </span>
+                </div>
+              </div>
+
+              <!-- Canvas Gráfico P17 (Barras Horizontales de Alto Rendimiento) -->
+              <div class="flex flex-col items-center justify-center bg-gray-50/70 rounded-2xl border border-gray-100 p-3 relative mb-4" style="height: 270px;">
+                <canvas id="p17-chart"></canvas>
+                <div id="p17-chart-empty" class="hidden absolute inset-0 flex flex-col items-center justify-center text-gray-300">
+                  <svg class="w-10 h-10 mb-1 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                  </svg>
+                  <p class="font-semibold text-xs text-gray-500">Sin datos de evaluación</p>
+                </div>
+              </div>
+
+              <!-- Tarjetas de desglose de opciones P17 -->
+              <div class="mb-3">
+                <div class="flex items-center justify-between pb-1.5 border-b border-gray-100 mb-2">
+                  <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Percepción de Información</span>
+                  <span id="p17-total-eval" class="text-xs font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                    0 respuestas
+                  </span>
+                </div>
+                <div id="p17-breakdown-cards" class="space-y-2">
+                  <!-- Se llena dinámicamente con las 4 opciones de P17 -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Insight interpretativo P17 -->
+            <div class="bg-indigo-50/60 rounded-xl p-3 border border-indigo-100 flex items-start gap-2.5 mt-2">
+              <svg class="w-4 h-4 text-indigo-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+              </svg>
+              <p id="p17-insight-text" class="text-xs text-indigo-950 leading-relaxed">
+                Calculando brecha de información...
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Panel Analítico: Diagnóstico y Directrices Operativas por Feria (Alimentado por el Filtro de Feria) -->
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 mb-6">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between pb-4 border-b border-gray-100 gap-3 mb-6">
+            <div>
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <span class="px-2.5 py-0.5 rounded-lg bg-blue-100 text-blue-800 text-xs font-black uppercase tracking-wider">
+                  Directrices Territoriales por Feria
+                </span>
+                <span id="feria-active-name" class="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                  Todas las ferias
+                </span>
+                <span id="feria-priority-badge" class="text-xs font-bold px-2.5 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200">
+                  Evaluando directrices...
+                </span>
+              </div>
+              <h3 id="feria-question-title" class="text-base sm:text-lg font-bold text-gray-800">
+                P16: Situación Actual Frente a la Ley N.º 21.745
+              </h3>
+              <p id="feria-question-subtitle" class="text-xs text-gray-400 mt-0.5">
+                Seleccione cualquier pregunta del cuestionario para generar su visualización analítica y plan de directrices en terreno
+              </p>
+            </div>
+
+            <!-- Controles del Gráfico de Directrices -->
+            <div class="flex flex-wrap items-center gap-3 self-start lg:self-auto">
+              <div>
+                <label for="feria-metric-select" class="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                  Pregunta a Graficar
+                </label>
+                <select id="feria-metric-select" onchange="window.__admin.renderFeriaDirectiveChart()"
+                  class="px-3 py-1.5 rounded-xl border border-blue-200 text-xs font-semibold text-gray-800 bg-blue-50/50 hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-xs sm:max-w-md truncate shadow-2xs">
+                  
+                  <optgroup label="Bloque 1: Perfil y Operación">
+                    <option value="q1">P1 – Comuna donde trabaja</option>
+                    <option value="q2">P2 – Feria y día de funcionamiento</option>
+                    <option value="q3">P3 – Antigüedad trabajando en ferias</option>
+                    <option value="q4">P4 – Días a la semana que trabaja</option>
+                    <option value="q5">P5 – Rubro o productos principales</option>
+                    <option value="q6">P6 – Volumen aproximado de ventas diarias</option>
+                    <option value="q7">P7 – Teléfono con internet</option>
+                  </optgroup>
+
+                  <optgroup label="Bloque 2: Conocimiento y Medios de Pago">
+                    <option value="q8">P8 – ¿Conoce la Ley N.º 21.745?</option>
+                    <option value="q9">P9 – Fuentes de información sobre la ley</option>
+                    <option value="q10">P10 – Visita o charla de la municipalidad</option>
+                    <option value="q11">P11 – Permiso municipal de funcionamiento</option>
+                    <option value="q12">P12 – Trámite previo en el SII</option>
+                    <option value="q13">P13 – Medios de pago aceptados</option>
+                    <option value="q14">P14 – Pagos con tarjeta / Máquina POS</option>
+                    <option value="q14_sub">P14.1 – Proporción de ventas con tarjeta</option>
+                    <option value="q15">P15 – Conocimiento de tasa de impuesto</option>
+                  </optgroup>
+
+                  <optgroup label="Bloque 3: Ramificación Clave">
+                    <option value="q16" selected>P16 – Situación actual frente a la Ley 21.745</option>
+                  </optgroup>
+
+                  <optgroup label="Bloque 4: Rama A (Inscritos)">
+                    <option value="a1">Sec. A1 – Facilidad o dificultad del trámite</option>
+                    <option value="a2">Sec. A2 – Principal dificultad para incorporarse</option>
+                    <option value="a3">Sec. A3 – Cambios en su forma de trabajar</option>
+                    <option value="a4">Sec. A4 – Lo que más cuesta del nuevo sistema</option>
+                  </optgroup>
+
+                  <optgroup label="Bloque 4: Rama B (No Inscritos)">
+                    <option value="b1">Sec. B1 – Razón por la que no se ha inscrito</option>
+                    <option value="b2">Sec. B2 – ¿Le gustaría inscribirse en el régimen?</option>
+                    <option value="b3">Sec. B3 – Ayuda para facilitar incorporación</option>
+                  </optgroup>
+
+                  <optgroup label="Bloque 4: Rama C (En Trámite)">
+                    <option value="c1">Sec. C1 – Estado actual de su trámite</option>
+                    <option value="c2">Sec. C2 – Principal dificultad durante el trámite</option>
+                    <option value="c3">Sec. C3 – Ayuda útil para terminar trámite</option>
+                  </optgroup>
+
+                  <optgroup label="Bloque 4: Rama D (No Sabe)">
+                    <option value="d1">Sec. D1 – Razón por la que no sabe su estado</option>
+                    <option value="d2">Sec. D2 – ¿Ha realizado algún trámite?</option>
+                    <option value="d3">Sec. D3 – ¿Sabe dónde consultar su situación?</option>
+                    <option value="d4">Sec. D4 – ¿Le gustaría recibir información?</option>
+                  </optgroup>
+
+                  <optgroup label="Bloque 5: Evaluación y Cierre">
+                    <option value="q17">P17 – Suficiencia de información sobre la ley</option>
+                    <option value="q18">P18 – ¿Desea recibir más información o ayuda?</option>
+                    <option value="q18_fuente">P18.1 – Institución o canal preferido</option>
+                  </optgroup>
+                </select>
+              </div>
+              <div>
+                <label for="feria-chart-type" class="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                  Tipo de Gráfico
+                </label>
+                <select id="feria-chart-type" onchange="window.__admin.renderFeriaDirectiveChart()"
+                  class="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs">
+                  <option value="horizontalBar" selected>Barras Horizontales</option>
+                  <option value="doughnut">Gráfico de Dona</option>
+                  <option value="pie">Gráfico de Pastel</option>
+                  <option value="bar">Barras Verticales</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contenido: Gráfico a la izquierda y Panel de Directrices a la derecha -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            
+            <!-- Canvas del Gráfico Directivo -->
+            <div class="lg:col-span-7 flex flex-col items-center justify-center bg-gray-50/70 rounded-2xl border border-gray-100 p-4 relative" style="min-height: 330px; height: 360px;">
+              <canvas id="feria-directive-chart"></canvas>
+              <div id="feria-chart-empty" class="hidden absolute inset-0 flex flex-col items-center justify-center text-gray-300">
+                <svg class="w-12 h-12 mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <p class="font-semibold text-sm">Sin datos para la feria seleccionada</p>
+                <p class="text-xs text-gray-400 mt-0.5">Selecciona otra feria o ajusta la comuna</p>
+              </div>
+            </div>
+
+            <!-- Panel de Directrices Operativas -->
+            <div class="lg:col-span-5 flex flex-col justify-between space-y-4">
+              <div>
+                <div class="flex items-center justify-between pb-2 border-b border-gray-100 mb-3">
+                  <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Directrices y Plan de Acción</span>
+                  <span id="feria-total-count" class="text-xs font-extrabold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                    0 feriantes
+                  </span>
+                </div>
+                
+                <!-- Desglose numérico rápido (% visible directamente) -->
+                <div id="feria-stats-breakdown" class="space-y-2 mb-4">
+                  <!-- Se llena dinámicamente con las barras de la feria seleccionada -->
+                </div>
+
+                <!-- Lista de Directrices Estratégicas Recomendadas -->
+                <div class="space-y-2">
+                  <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Recomendaciones para el Equipo de Terreno:</p>
+                  <div id="feria-directive-actions" class="space-y-2">
+                    <!-- Se llena con las acciones operativas concretas -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Banner de Focalización Municipal / SII -->
+              <div class="bg-blue-50/70 rounded-xl p-3 border border-blue-100 flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+                <p id="feria-target-summary" class="text-xs text-blue-900 leading-relaxed">
+                  Cargando directrices para el equipo de terreno...
+                </p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Widget 3: Tabla de Resumen Estática (Desglose por Categoría y Feria) -->
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 mb-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-gray-100 mb-4">
+            <div>
+              <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                Tabla de Resumen Territorial (Desglose por Comuna y Feria)
+              </h3>
+              <p class="text-xs text-gray-400 mt-0.5">Métricas consolidadas de formalización (P16) y adopción de medios electrónicos (P14)</p>
+            </div>
+            <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/50 self-start sm:self-auto">
+              Datos consolidados en pantalla
+            </span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 text-gray-500 uppercase text-[11px] font-bold">
+                <tr>
+                  <th class="text-left px-4 py-3 rounded-l-xl">Comuna</th>
+                  <th class="text-left px-4 py-3">Feria / Sector</th>
+                  <th class="text-center px-4 py-3">Total Muestra</th>
+                  <th class="text-center px-4 py-3">% de la Muestra</th>
+                  <th class="text-center px-4 py-3">Formalizados (P16)</th>
+                  <th class="text-center px-4 py-3">Con POS (P14)</th>
+                  <th class="text-left px-4 py-3 rounded-r-xl">Proporción de Muestra</th>
+                </tr>
+              </thead>
+              <tbody id="summary-breakdown-tbody" class="divide-y divide-gray-100 text-xs sm:text-sm">
+                <!-- Se llena dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tabla de respuestas individuales -->
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div class="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-gray-800 text-base">Registro de respuestas individuales</h3>
+              <span id="table-count" class="text-xs text-gray-400 font-medium"></span>
+            </div>
+            <button onclick="window.__admin.exportToExcel()"
+              class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm active:scale-95 transition-all shadow-sm">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              <span>Exportar toda la data a Excel (.xlsx)</span>
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full resp-table text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="text-left px-4 py-3">Fecha</th>
+                  <th class="text-left px-4 py-3">Comuna (P1)</th>
+                  <th class="text-left px-4 py-3">Feria y Día (P2)</th>
+                  <th class="text-left px-4 py-3">Ley 21.745 (P16)</th>
+                  <th class="text-left px-4 py-3">Máquina POS (P14)</th>
+                  <th class="text-left px-4 py-3">Info Ley (P17)</th>
+                </tr>
+              </thead>
+              <tbody id="responses-tbody" class="divide-y divide-gray-100 text-sm">
+                <tr>
+                  <td colspan="6" class="text-center py-14 text-gray-300">
+                    <div class="flex flex-col items-center gap-2">
+                      <div class="w-7 h-7 border-4 border-brand-400 border-t-transparent rounded-full animate-spin"></div>
+                      <span class="text-xs">Cargando respuestas…</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section><!-- /dashboard -->
+
+      <!-- ══════════ PANEL: EDITAR PREGUNTAS FIJAS ══════════ -->
+      <section id="panel-preguntas-fijas" class="panel">
+
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6 mb-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+            <div>
+              <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+                Editar Preguntas de la Encuesta
+              </h3>
+              <p class="text-xs text-gray-400 mt-1">Modifica el texto y las opciones de las preguntas fijas. Los cambios se aplican en tiempo real.</p>
+            </div>
+            <button onclick="window.__admin.saveAllFixedQuestions()"
+              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700
+                     text-white font-bold text-sm active:scale-95 transition-all shadow-sm whitespace-nowrap">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+              </svg>
+              Guardar cambios
+            </button>
+          </div>
+
+          <!-- Tabs de secciones -->
+          <div class="flex flex-wrap items-center gap-2 mb-4 border-b border-gray-100 pb-4">
+            <button onclick="window.__admin.showQuestionTab('flujo')"
+              class="q-tab-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-brand-600 text-white shadow-sm flex items-center gap-2 transition-all active:scale-95"
+              data-tab="flujo">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+              </svg>
+              📋 Flujo Completo (Arrastrar y Soltar)
+            </button>
+            <button onclick="window.__admin.showQuestionTab('general')"
+              class="q-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+              data-tab="general">Generales (P1–P8)</button>
+            <button onclick="window.__admin.showQuestionTab('secA')"
+              class="q-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+              data-tab="secA">Sección A · Inscritos</button>
+            <button onclick="window.__admin.showQuestionTab('secB')"
+              class="q-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+              data-tab="secB">Sección B · No inscritos</button>
+            <button onclick="window.__admin.showQuestionTab('secC')"
+              class="q-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+              data-tab="secC">Sección C · En trámite</button>
+            <button onclick="window.__admin.showQuestionTab('secD')"
+              class="q-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+              data-tab="secD">Sección D · No sabe</button>
+            <button onclick="window.__admin.showQuestionTab('dinamicas')"
+              class="q-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors flex items-center gap-1.5"
+              data-tab="dinamicas">
+              <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+              Preguntas Dinámicas / Agregadas
+            </button>
+          </div>
+
+          <!-- Banner explicativo de arrastrar y reordenar -->
+          <div id="drag-hint-banner" class="bg-emerald-50/80 border border-emerald-200/80 rounded-xl p-3.5 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-900">
+            <div class="flex items-center gap-2.5">
+              <span class="text-lg">✋</span>
+              <span><strong>Reordenamiento automático:</strong> Arrastra las preguntas desde el icono <strong>⋮⋮</strong> o usa los botones <strong>⬆ Subir / ⬇ Bajar</strong>. Los números <strong>#1, #2, #3…</strong> se actualizan automáticamente en tiempo real sin duplicados.</span>
+            </div>
+            <span class="self-start sm:self-auto px-2 py-0.5 rounded-md bg-white border border-emerald-200 font-bold text-[11px] text-emerald-700 whitespace-nowrap">
+              Auto-renumeración activa
+            </span>
+          </div>
+
+          <!-- Contenedor de preguntas fijas (renderizado por JS) -->
+          <div id="fixed-questions-container" class="space-y-4">
+            <div class="flex flex-col items-center justify-center py-12 text-gray-300">
+              <div class="w-7 h-7 border-4 border-brand-400 border-t-transparent rounded-full animate-spin"></div>
+              <span class="text-xs mt-2">Cargando preguntas…</span>
+            </div>
+          </div>
+        </div>
+
+      </section><!-- /preguntas-fijas -->
+
+      <!-- ══════════ PANEL: PREGUNTAS DINÁMICAS ══════════ -->
+      <section id="panel-preguntas" class="panel">
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
+
+          <!-- Formulario de pregunta -->
+          <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
+            <h3 id="form-q-title" class="font-bold text-gray-800 text-base mb-5">
+              Agregar nueva pregunta dinámica
+            </h3>
+            <form id="question-form" class="space-y-4">
+              <input type="hidden" id="edit-q-id">
+
+              <div>
+                <label class="block text-sm font-semibold text-gray-600 mb-1.5">
+                  Título de la pregunta *
+                </label>
+                <textarea id="q-titulo" rows="3" required
+                  placeholder="Escriba aquí el enunciado de la pregunta…"
+                  class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-700 text-sm
+                         focus:outline-none focus:border-brand-500 transition-colors resize-none"></textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold text-gray-600 mb-1.5">
+                  Tipo de pregunta *
+                </label>
+                <select id="q-tipo" onchange="window.__admin.toggleOpciones()"
+                  class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-700 text-sm
+                         focus:outline-none focus:border-brand-500 transition-colors">
+                  <option value="single">Selección única</option>
+                  <option value="multi">Selección múltiple</option>
+                  <option value="text">Texto abierto</option>
+                </select>
+              </div>
+
+              <div id="opciones-section">
+                <label class="block text-sm font-semibold text-gray-600 mb-1">
+                  Opciones de respuesta
+                </label>
+                <p class="text-xs text-gray-400 mb-2">Ingrese cada opción en una línea separada</p>
+                <textarea id="q-opciones" rows="5"
+                  placeholder="Opción 1&#10;Opción 2&#10;Opción 3"
+                  class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-700 text-sm
+                         focus:outline-none focus:border-brand-500 transition-colors resize-none"></textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold text-gray-600 mb-1.5">
+                  Orden de aparición
+                </label>
+                <input type="number" id="q-orden" min="1" value="1"
+                  class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-700 text-sm
+                         focus:outline-none focus:border-brand-500 transition-colors">
+              </div>
+
+              <div class="flex gap-3 pt-1">
+                <button type="submit"
+                  class="flex-1 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm
+                         active:scale-95 transition-all duration-150 flex items-center justify-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  <span id="q-save-label">Guardar pregunta</span>
+                </button>
+                <button type="button" id="btn-cancel-edit"
+                  onclick="window.__admin.cancelEdit()"
+                  class="hidden px-4 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm
+                         font-semibold hover:bg-gray-50 transition-colors">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Lista de preguntas dinámicas -->
+          <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div class="px-4 sm:px-6 py-4 border-b border-gray-100">
+              <h3 class="font-bold text-gray-800 text-base">Preguntas dinámicas activas</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Sincronizadas en tiempo real con la encuesta pública</p>
+            </div>
+            <div id="dq-list" class="p-4 space-y-3 max-h-[520px] overflow-y-auto">
+              <p class="text-center text-gray-400 text-sm py-10">Sin preguntas dinámicas todavía.</p>
+            </div>
+          </div>
+
+        </div>
+      </section><!-- /preguntas -->
+
+      <!-- ══════════  QR ══════════ -->  
+      <section id="panel-qr" class="panel">
+        <div class="max-w-lg mx-auto">
+          <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+
+            <div class="bg-gradient-to-br from-brand-600 to-emerald-500 px-6 sm:px-8 py-8 text-white text-center">
+              <svg class="w-10 h-10 mx-auto mb-3 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+              </svg>
+              <h3 class="text-xl font-extrabold mb-1">Código QR de la encuesta</h3>
+              <p class="text-brand-100 text-sm">Genere y descargue para exhibir en las ferias</p>
+            </div>
+
+            <div class="p-5 sm:p-7 space-y-5">
+              <!-- URL Input -->
+              <div>
+                <label class="block text-sm font-semibold text-gray-600 mb-1.5">
+                  URL de la encuesta pública
+                </label>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <input type="url" id="qr-url"
+                    class="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-700 text-sm
+                           focus:outline-none focus:border-brand-500 transition-colors"
+                    placeholder="https://tu-proyecto.web.app">
+                  <button onclick="window.__admin.generateQR()"
+                    class="px-5 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm
+                           active:scale-95 transition-all">
+                    Generar
+                  </button>
+                </div>
+              </div>
+
+              <!-- QR Result -->
+              <div id="qr-result" class="hidden text-center space-y-5">
+                <div class="inline-block border-8 border-gray-100 rounded-2xl shadow-md">
+                  <div class="p-4 bg-white rounded-xl">
+                    <canvas id="qr-canvas"></canvas>
+                  </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button onclick="window.__admin.downloadQR()"
+                    class="flex items-center justify-center gap-2 px-6 py-3 rounded-xl
+                           bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm
+                           active:scale-95 transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Descargar PNG
+                  </button>
+                  <button onclick="window.__admin.printPoster()"
+                    class="flex items-center justify-center gap-2 px-6 py-3 rounded-xl
+                           bg-gray-700 hover:bg-gray-800 text-white font-bold text-sm
+                           active:scale-95 transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                    </svg>
+                    Imprimir afiche
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section><!-- /qr -->
+
+    </div><!-- /p-6 -->
+  </main>
+</div><!-- /admin-panel -->
+
+<!-- Toast container -->
+<div id="admin-toast" class="fixed top-4 right-4 z-50 space-y-2 max-w-sm w-full pointer-events-none px-4 lg:px-0"></div>
+
+<!-- Admin module -->
+<script type="module" src="js/admin.js?v=16"></script>
+</body>
+</html>

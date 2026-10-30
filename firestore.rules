@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Respuestas de la encuesta pública ──────────────────
+    // Cualquier usuario (anónimo) puede crear una respuesta.
+    // Nadie (salvo el panel backend) puede leer, modificar o eliminar.
+    match /respuestas/{docId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null
+        && request.auth.token.email in [
+          'constanza.garrido.i@usach.cl',
+          'anais.flores@usach.cl'
+        ];
+    }
+
+    // ── Preguntas dinámicas ────────────────────────────────
+    // Lectura pública (la encuesta las necesita).
+    // Solo admins autenticados pueden escribir/modificar/eliminar.
+    match /preguntas_dinamicas/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.token.email in [
+          'constanza.garrido.i@usach.cl',
+          'anais.flores@usach.cl'
+        ];
+    }
+
+    // ── Configuración / Preguntas fijas editables ──────────
+    // Lectura pública (la encuesta carga los textos al iniciar).
+    // Solo admins autenticados pueden escribir.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.token.email in [
+          'constanza.garrido.i@usach.cl',
+          'anais.flores@usach.cl'
+        ];
+    }
+  }
+}
